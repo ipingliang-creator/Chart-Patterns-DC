@@ -1,0 +1,49 @@
+name: collect
+
+# Manual run + weekly refresh only. NEVER add pull_request or
+# pull_request_target triggers: this workflow reads repo secrets, and a
+# fork PR trigger would let an outside contributor exfiltrate them.
+on:
+  workflow_dispatch:
+  schedule:
+    # Sunday 11:00 UTC — lands before the trading bot's Sunday backtest.
+    - cron: "0 11 * * 0"
+
+# Don't let a manual run and the schedule stomp each other.
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # commit the refreshed dataset back to the repo
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Collect bars
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        run: python collect.py
+
+      - name: Commit dataset
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --staged --quiet; then
+            echo "no changes to commit"
+          else
+            git commit -m "data: refresh $(date -u +%F)"
+            git push
+          fi
