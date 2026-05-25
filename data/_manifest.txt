@@ -1,0 +1,7 @@
+generated_utc: 2026-05-25
+requested: 507
+written: 507
+missing: 0
+feed: iex
+adjustment: split
+history_bars: 400
